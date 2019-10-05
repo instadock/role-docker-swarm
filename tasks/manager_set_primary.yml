@@ -1,0 +1,11 @@
+---
+
+- name: "Set primary manager"
+  set_fact:
+    docker_swarm_mgr_primary: "{{ inventory_hostname }}"
+  delegate_to: "{{ item }}"
+  delegate_facts: true
+  with_items: "{{ groups['docker'] }}"
+  changed_when: false
+  run_once: true
+

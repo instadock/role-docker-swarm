@@ -1,0 +1,31 @@
+---
+
+- name: "Drain managers before demote"
+  include_tasks: "common_drain.yml"
+
+- name: "Demote managers to workers"
+  shell: >
+    docker node demote '{{ docker_swarm_node_id }}'
+  delegate_to: "{{groups['docker_swarm_mgr'][0]}}"
+
+- name: "Verify node connected on manager as worker"
+  shell: >
+    docker node inspect --format {% raw %}'{{.Spec.Role}},{{.Status.State}}{{if eq .Spec.Role "manager"}},{{.ManagerStatus.Reachability}}{{end}}'{% endraw %} '{{ docker_swarm_node_id }}'
+  delegate_to: "{{groups['docker_swarm_mgr'][0]}}"
+  register: docker_swarm_mgr_node_status
+  failed_when: >
+    (docker_swarm_mgr_node_status.rc != 0) or
+    ('worker,ready' not in docker_swarm_mgr_node_status.stdout)
+  retries: 5
+  delay: 5
+  changed_when: false
+
+- name: "Update engine state"
+  include_tasks: "common_state.yml"
+
+- name: "Verify new state"
+  fail:
+    msg: "Node did not demote to a worker"
+  when:
+  - "docker_swarm_status != 'worker'"
+

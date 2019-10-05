@@ -1,0 +1,80 @@
+---
+
+# clean managers by checking cluster id
+
+- name: "Gather current cluster id"
+  shell: "{% raw %}docker info -f '{{ .Swarm.Cluster.ID }}'{% endraw %}"
+  changed_when: false
+  register: docker_swarm_clusterid_shell
+  when:
+  - "docker_swarm_status == 'manager'"
+
+- name: "Fail on mismatch (force disabled)"
+  fail:
+    msg: "Manager is in another cluster, use docker_swarm_force to automatically leave the other cluster"
+  when:
+  - "docker_swarm_status == 'manager'"
+  - "docker_swarm_clusterid != (docker_swarm_clusterid_shell.stdout | trim)"
+  - "docker_swarm_force != true"
+  
+- name: "Leave swarm if cluster id does not match (force enabled)"
+  shell: "docker swarm leave --force && sleep 15"
+  register: docker_swarm_leave_shell
+  when:
+  - "docker_swarm_status == 'manager'"
+  - "docker_swarm_clusterid != (docker_swarm_clusterid_shell.stdout | trim)"
+  
+# cleanup workers that do not exist on manager
+
+- name: "Get node state on manager by node_id"
+  shell: >
+    docker node inspect '{{ docker_swarm_node_id }}' --format {% raw %}'{{ .Status.State }}'{% endraw %})
+  failed_when: false 
+  changed_when: false
+  delegate_to: "{{ docker_swarm_mgr_primary }}"
+  register: docker_swarm_mgr_node_status
+  when:
+  - "docker_swarm_status == 'worker'"
+
+- name: "Leave swarm if node does not exist on manager"
+  shell: "docker swarm leave --force && sleep 15"
+  register: docker_swarm_leave_shell
+  when:
+  - "docker_swarm_status == 'worker'"
+  - "'No such node' in docker_swarm_mgr_node_status.stderr"
+
+# Give time for leave to complete and then update node state
+
+- name: "Update engine state"
+  include_tasks: "common_state.yml"
+  when:
+  - "docker_swarm_leave_shell is defined"
+  - "docker_swarm_leave_shell.changed"
+
+# cleanup old down hostname on manager when node is not in a swarm
+
+- name: "Get node state on manager by hostname"
+  shell: >
+    docker node inspect '{{ ansible_hostname }}' --format {% raw %}'{{ .Status.State }}'{% endraw %}
+  failed_when: false 
+  changed_when: false
+  delegate_to: "{{ docker_swarm_mgr_primary }}"
+  register: docker_swarm_mgr_node_status
+  when:
+  - "docker_swarm_status == 'standalone'"
+
+- name: "Delete down node from manager"
+  shell: |
+    role="$(docker node inspect '{{ ansible_hostname }}' --format {% raw %}'{{ .Spec.Role }}'{% endraw %})"
+    if [ "${role}" = "manager" ]; then
+      docker node demote '{{ ansible_hostname }}'
+      sleep 10
+    fi
+    docker node rm '{{ ansible_hostname }}'
+  delegate_to: "{{ docker_swarm_mgr_primary }}"
+  register: docker_swarm_mgr_node_status
+  when:
+  - "docker_swarm_status == 'standalone'"
+  - "docker_swarm_mgr_node_status.rc == 0"
+  - "'down' in docker_swarm_mgr_node_status.stdout"
+

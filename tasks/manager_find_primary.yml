@@ -1,0 +1,20 @@
+---
+
+# Note, include_tasks is needed here because "run_once" and "when" do not
+# interoperate nicely.
+
+- name: "Find primary manager from manager list"
+  include_tasks: "manager_set_primary.yml"
+  when:
+  - "'docker_swarm_mgr' in group_names"
+  - "'docker' in group_names"
+  - "docker_swarm_status == 'manager'"
+
+- name: "Find primary manager from any node (fallback)"
+  include_tasks: "manager_set_primary.yml"
+  when:
+  - "docker_swarm_mgr_primary is not defined"
+  - "'docker_swarm_mgr' in group_names"
+  - "'docker' in group_names"
+  - "docker_swarm_status == 'manager'"
+

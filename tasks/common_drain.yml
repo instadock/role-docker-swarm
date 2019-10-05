@@ -1,0 +1,19 @@
+---
+
+- name: "Check current node state"
+  shell: >
+    docker node inspect --format {% raw %}'{{ .Spec.Availability }}'{% endraw %} '{{ docker_swarm_node_id }}'
+  delegate_to: "{{groups['docker_swarm_mgr'][0]}}"
+  register: docker_swarm_node_availability
+  changed_when: false
+  when:
+  - "docker_swarm_drain == true"
+
+- name: "Configure node as drained"
+  shell: >
+    docker node update --availability drain '{{ docker_swarm_node_id }}' && sleep 15
+  delegate_to: "{{groups['docker_swarm_mgr'][0]}}"
+  when:
+  - "docker_swarm_drain == true"
+  - "'drain' not in docker_swarm_node_availability.stdout"
+

@@ -1,0 +1,21 @@
+---
+
+- name: "Save cluster id"
+  shell: "{% raw %}docker info -f '{{ .Swarm.Cluster.ID }}'{% endraw %}"
+  changed_when: false
+  register: docker_swarm_clusterid_shell
+
+- name: "Save worker join token"
+  shell: "docker swarm join-token worker -q"
+  changed_when: false
+  register: docker_swarm_token_worker_shell
+
+- name: "Set swarm facts"
+  set_fact:
+    docker_swarm_token_worker:  "{{ docker_swarm_token_worker_shell.stdout | trim }}"
+    docker_swarm_clusterid:     "{{ docker_swarm_clusterid_shell.stdout | trim }}"
+  delegate_to: "{{ item }}"
+  delegate_facts: True
+  with_items: "{{ groups['docker'] }}"
+  changed_when: false
+

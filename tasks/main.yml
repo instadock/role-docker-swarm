@@ -1,0 +1,65 @@
+---
+- name: "Gather current engine state"
+  include_tasks: "common_state.yml"
+
+- name: "Select a primary manager"
+  include_tasks: "manager_find_primary.yml"
+
+- name: "Init swarm if needed"
+  include_tasks: "manager_init.yml"
+  when:
+  - "docker_swarm_mgr_primary is not defined"
+  - "'docker_swarm_mgr' in group_names"
+  - "'standalone' == docker_swarm_status"
+  run_once: true
+
+- name: "Gather manager details"
+  include_tasks: "manager_state.yml"
+  when:
+  - "docker_swarm_mgr_primary == inventory_hostname"
+
+- name: "Check for nodes in wrong cluster"
+  include_tasks: "common_membership.yml"
+  when:
+  - "docker_swarm_mgr_primary != inventory_hostname"
+
+- name: "Join managers as workers"
+  include_tasks: "worker_join.yml"
+  when:
+  - "docker_swarm_mgr_primary != inventory_hostname"
+  - "'docker_swarm_mgr' in group_names"
+  - "docker_swarm_status == 'standalone'"
+
+- name: "Promote managers"
+  include_tasks: "manager_promote.yml"
+  when:
+  - "docker_swarm_mgr_primary != inventory_hostname"
+  - "'docker_swarm_mgr' in group_names"
+  - "docker_swarm_status == 'worker'"
+
+- name: "Join workers"
+  include_tasks: "worker_join.yml"
+  when:
+  - "'docker_swarm_wkr' in group_names"
+  - "docker_swarm_status == 'standalone'"
+
+- name: "Demote managers"
+  include_tasks: "manager_demote.yml"
+  when:
+  - "'docker_swarm_mgr' not in group_names"
+  - "'docker_swarm_wkr' in group_names"
+  - "docker_swarm_status == 'manager'"
+
+- name: "Update a primary manager"
+  include_tasks: "manager_find_primary.yml"
+  when:
+  - "hostvars[docker_swarm_mgr_primary].docker_swarm_status != 'manager'"
+
+- name: "Test network connectivity"
+  include_tasks: "network_test.yml"
+  when:
+  - "docker_swarm_network_test == true"
+
+- name: "Set nodes to active"
+  include_tasks: "common_active.yml"
+

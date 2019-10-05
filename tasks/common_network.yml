@@ -1,0 +1,6 @@
+---
+
+- name: "Verify network connectivity"
+  debug:
+    msg: "TODO"
+

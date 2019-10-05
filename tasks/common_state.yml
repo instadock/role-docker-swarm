@@ -1,0 +1,21 @@
+---
+
+# trying to add line breaks here was sadly not working, PR's welcome
+- name: "Check swarm status"
+  shell: |
+    {% raw %} docker info -f '{{ if and (eq .Swarm.LocalNodeState "active") .Swarm.ControlAvailable }}manager{{ else if and (eq .Swarm.LocalNodeState "active") (not .Swarm.ControlAvailable) }}worker{{ else if eq .Swarm.LocalNodeState "inactive" }}standalone{{ else }}undef{{ end }}' {% endraw %}
+  changed_when: false
+  register: docker_swarm_status_shell
+
+- name: "Lookup current node_id"
+  shell: "docker info -f {% raw %}'{{ .Swarm.NodeID }}'{% endraw %}"
+  register: docker_swarm_node_id_shell
+  changed_when: false
+  when:
+  - "'standalone' not in docker_swarm_status_shell.stdout"
+
+- name: "Save status facts"
+  set_fact:
+    docker_swarm_status: "{{ docker_swarm_status_shell.stdout | trim }}"
+    docker_swarm_node_id: "{{ docker_swarm_node_id_shell.stdout | d() | trim }}"
+

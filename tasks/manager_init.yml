@@ -1,0 +1,29 @@
+---
+
+- name: "Create initial manager"
+  shell: |
+    docker swarm init \
+      --advertise-addr={{ docker_swarm_iface | default(ansible_default_ipv4.interface) }} \
+    && sleep 15
+
+- name: "Save manager to active group"
+  add_host:
+    hostname: "{{ item }}"
+    groups:
+    - docker_swarm_mgr_active
+  with_items: "{{ ansible_play_hosts }}"
+  changed_when: false
+
+- name: "Update engine state"
+  include_tasks: "common_state.yml"
+
+- name: "Verify node has initialized"
+  fail:
+    msg: "Node does not appear to be a manager"
+  when:
+  - "docker_swarm_status != 'manager'"
+
+- name: "Save primary manager"
+  include_tasks: "manager_set_primary.yml"
+
+

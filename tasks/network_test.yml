@@ -1,0 +1,16 @@
+---
+
+- name: "Network Test to Manager"
+  wait_for:
+    host: "{{ item[0] }}"
+    port: "{{ item[1] }}"
+    timeout: 1
+  loop: "{{ groups['docker_swarm_mgr'] | product(docker_swarm_ports_mgr) | list }}"
+
+- name: "Network Test to Worker"
+  wait_for:
+    host: "{{ item[0] }}"
+    port: "{{ item[1] }}"
+    timeout: 1
+  loop: "{{ groups['docker_swarm_wkr'] | product(docker_swarm_ports_wkr) | list }}"
+

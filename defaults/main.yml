@@ -1,0 +1,14 @@
+---
+
+# drain nodes before making changes
+# this also configures all nodes to be active once swarm setup is complete
+docker_swarm_drain: true
+
+# leave existing swarm if cluster id does not match
+docker_swarm_force: false
+
+# network testing between nodes to identify FW issues
+docker_swarm_network_test: true
+docker_swarm_ports_mgr: [ 2377, 7946 ]
+docker_swarm_ports_wkr: [ 7946 ]
+

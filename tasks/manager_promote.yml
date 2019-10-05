@@ -1,0 +1,35 @@
+---
+
+- name: "Drain managers before demote"
+  include_tasks: "common_drain.yml"
+
+- name: "Promote to manager"
+  shell: >
+    docker node promote '{{ docker_swarm_node_id }}' && sleep 15
+  delegate_to: "{{ docker_swarm_mgr_primary }}"
+
+- name: "Verify node connected on manager as manager"
+  shell: >
+    docker node inspect --format {% raw %}'{{.Spec.Role}},{{.Status.State}}{{if eq .Spec.Role "manager"}},{{.ManagerStatus.Reachability}}{{end}}'{% endraw %} '{{ docker_swarm_node_id }}'
+  delegate_to: "{{ docker_swarm_mgr_primary }}"
+  register: docker_swarm_mgr_node_status
+  failed_when: >
+    (docker_swarm_mgr_node_status.rc != 0) or
+    ('manager,ready,reachable' not in docker_swarm_mgr_node_status.stdout)
+  retries: 5
+  delay: 5
+  changed_when: false
+
+- name: "Update engine state"
+  include_tasks: "common_state.yml"
+
+- name: "Verify node is a manager"
+  fail:
+    msg: "Node does not appear to be a manager"
+  when:
+  - "docker_swarm_status != 'manager'"
+
+
+
+
+
